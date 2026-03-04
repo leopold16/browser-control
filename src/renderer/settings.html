@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <link rel="stylesheet" href="settings.css">
+  <title>Settings</title>
+</head>
+<body>
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">API</span>
+      <button class="close-btn" id="close-btn" title="Close panel">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="panel-body">
+      <div class="field">
+        <div class="field-label">ENDPOINT</div>
+        <div class="field-value" id="api-url" title="Click to copy">http://localhost:3000</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">API KEY</div>
+        <div class="field-value mono" id="api-key" title="Click to copy">Loading...</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <div class="field-label">QUICK TEST</div>
+        <pre class="code-block">curl -H "Authorization: Bearer &lt;key&gt;" \
+  http://localhost:3000/snapshot</pre>
+      </div>
+
+      <div class="field">
+        <div class="field-label">ENDPOINTS</div>
+        <div class="endpoint-list">
+          <div class="endpoint"><span class="method get">GET</span><span class="path">/snapshot</span></div>
+          <div class="endpoint"><span class="method post">POST</span><span class="path">/action</span></div>
+          <div class="endpoint"><span class="method get">GET</span><span class="path">/screenshot</span></div>
+          <div class="endpoint"><span class="method get">GET</span><span class="path">/tabs</span></div>
+          <div class="endpoint"><span class="method post">POST</span><span class="path">/tabs</span></div>
+          <div class="endpoint"><span class="method del">DEL</span><span class="path">/tabs/:id</span></div>
+          <div class="endpoint"><span class="method post">POST</span><span class="path">/tabs/:id/activate</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="settings-renderer.js"></script>
+</body>
+</html>

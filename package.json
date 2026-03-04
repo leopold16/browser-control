@@ -1,0 +1,20 @@
+{
+  "name": "browser-control",
+  "version": "1.0.0",
+  "description": "Controllable browser - Electron app with REST API for LLM control",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc && cp src/renderer/index.html src/renderer/styles.css src/renderer/settings.html src/renderer/settings.css dist/renderer/",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron ."
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.0",
+    "electron": "^33.2.0",
+    "typescript": "^5.5.0"
+  }
+}

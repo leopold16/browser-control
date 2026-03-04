@@ -1,0 +1,218 @@
+:root {
+  --bg: #0a0a0b;
+  --surface: #141415;
+  --surface-hover: #1c1c1e;
+  --surface-active: #232326;
+  --border: #27272a;
+  --border-hover: #3f3f46;
+  --text: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #2563eb;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 78px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-app-region: drag;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============ Tab Bar ============ */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 6px 10px 0;
+  padding-left: 80px;
+  gap: 2px;
+  overflow-x: auto;
+  -webkit-app-region: drag;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  background: transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--text-secondary);
+  cursor: pointer;
+  max-width: 200px;
+  min-width: 80px;
+  gap: 8px;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition);
+  border: 1px solid transparent;
+  border-bottom: none;
+  position: relative;
+}
+
+.tab:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--surface);
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  letter-spacing: -0.01em;
+}
+
+.tab-close {
+  font-size: 15px;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition), color var(--transition);
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.tab:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.new-tab-btn {
+  -webkit-app-region: no-drag;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition);
+}
+
+.new-tab-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* ============ Navigation Bar ============ */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 10px 6px;
+  padding-left: 80px;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.nav-btn {
+  -webkit-app-region: no-drag;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), color var(--transition);
+}
+
+.nav-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.nav-btn:active {
+  background: var(--surface-active);
+}
+
+.nav-btn.active {
+  background: var(--surface-active);
+  color: var(--text);
+}
+
+.url-bar {
+  -webkit-app-region: no-drag;
+  flex: 1;
+  height: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  padding: 0 14px;
+  outline: none;
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+  letter-spacing: -0.01em;
+}
+
+.url-bar::placeholder {
+  color: var(--text-muted);
+}
+
+.url-bar:focus {
+  border-color: var(--border-hover);
+  background: var(--surface-hover);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
+}
