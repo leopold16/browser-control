@@ -30,3 +30,5 @@ panelApiKeyEl.addEventListener('click', () => panelCopyToClipboard(panelApiKeyEl
 settingsApi.getApiKey().then((key) => {
   panelApiKeyEl.textContent = key;
 });
+
+export {};

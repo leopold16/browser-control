@@ -1,6 +1,7 @@
 import { WebContents } from 'electron';
 import { cdpSend } from './cdp';
 import { getRefMap } from './snapshot';
+import { logActivity } from './activity-log';
 import * as tabManager from './tab-manager';
 
 interface ActionResult {
@@ -61,9 +62,128 @@ async function getBoxCenter(
   return { x, y };
 }
 
+function escapeForTemplate(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$\{/g, '\\${');
+}
+
+async function showInteractionOverlay(
+  webContents: WebContents,
+  x: number,
+  y: number,
+  label: string
+): Promise<void> {
+  const safeLabel = escapeForTemplate(label);
+  await webContents
+    .executeJavaScript(
+      `(() => {
+        const overlayId = '__browser_control_overlay__';
+        let root = document.getElementById(overlayId);
+        if (!root) {
+          root = document.createElement('div');
+          root.id = overlayId;
+          root.style.position = 'fixed';
+          root.style.left = '0';
+          root.style.top = '0';
+          root.style.width = '0';
+          root.style.height = '0';
+          root.style.zIndex = '2147483647';
+          root.style.pointerEvents = 'none';
+          document.documentElement.appendChild(root);
+        }
+
+        const pulse = document.createElement('div');
+        pulse.style.position = 'fixed';
+        pulse.style.left = '${x}px';
+        pulse.style.top = '${y}px';
+        pulse.style.transform = 'translate(-50%, -50%)';
+        pulse.style.width = '18px';
+        pulse.style.height = '18px';
+        pulse.style.borderRadius = '999px';
+        pulse.style.border = '2px solid rgba(96, 165, 250, 0.95)';
+        pulse.style.boxShadow = '0 0 0 10px rgba(96, 165, 250, 0.18)';
+        pulse.style.background = 'rgba(15, 23, 42, 0.9)';
+        pulse.style.transition = 'all 260ms ease';
+
+        const tag = document.createElement('div');
+        tag.textContent = '${safeLabel}';
+        tag.style.position = 'fixed';
+        tag.style.left = '${x + 14}px';
+        tag.style.top = '${y + 14}px';
+        tag.style.padding = '5px 8px';
+        tag.style.borderRadius = '999px';
+        tag.style.background = 'rgba(15, 23, 42, 0.92)';
+        tag.style.color = '#f8fafc';
+        tag.style.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+        tag.style.border = '1px solid rgba(148, 163, 184, 0.25)';
+        tag.style.transition = 'opacity 260ms ease';
+
+        root.appendChild(pulse);
+        root.appendChild(tag);
+        requestAnimationFrame(() => {
+          pulse.style.width = '34px';
+          pulse.style.height = '34px';
+          pulse.style.opacity = '0';
+          pulse.style.boxShadow = '0 0 0 18px rgba(96, 165, 250, 0)';
+          tag.style.opacity = '0';
+        });
+
+        setTimeout(() => {
+          pulse.remove();
+          tag.remove();
+        }, 420);
+      })();`,
+      true
+    )
+    .catch(() => {});
+}
+
+async function setElementValue(
+  webContents: WebContents,
+  objectId: string,
+  text: string,
+  append: boolean
+): Promise<void> {
+  const nextValue = JSON.stringify(text);
+  await cdpSend(webContents, 'Runtime.callFunctionOn', {
+    objectId,
+    functionDeclaration: `function() {
+      const incomingValue = ${nextValue};
+      const element = this;
+      element.focus();
+
+      if (element.isContentEditable) {
+        const currentValue = element.innerText || '';
+        element.innerText = ${append ? 'currentValue + incomingValue' : 'incomingValue'};
+        element.dispatchEvent(new InputEvent('input', { bubbles: true, data: incomingValue, inputType: 'insertText' }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+
+      const currentValue = typeof element.value === 'string' ? element.value : '';
+      const finalValue = ${append ? 'currentValue + incomingValue' : 'incomingValue'};
+      const proto =
+        element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+      if (descriptor && descriptor.set) {
+        descriptor.set.call(element, finalValue);
+      } else {
+        element.value = finalValue;
+      }
+
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }`,
+  });
+}
+
 async function clickAction(webContents: WebContents, ref: number): Promise<ActionResult> {
   const backendNodeId = resolveRef(webContents, ref);
   const { x, y } = await getBoxCenter(webContents, backendNodeId);
+  await showInteractionOverlay(webContents, x, y, `Click ${ref}`);
 
   await cdpSend(webContents, 'Input.dispatchMouseEvent', {
     type: 'mousePressed',
@@ -85,7 +205,9 @@ async function clickAction(webContents: WebContents, ref: number): Promise<Actio
 
 async function typeAction(webContents: WebContents, ref: number, text: string): Promise<ActionResult> {
   const backendNodeId = resolveRef(webContents, ref);
+  const { x, y } = await getBoxCenter(webContents, backendNodeId);
   const objectId = await getRemoteObject(webContents, ref);
+  await showInteractionOverlay(webContents, x, y, `Type ${ref}`);
 
   // Focus the element
   await cdpSend(webContents, 'Runtime.callFunctionOn', {
@@ -93,38 +215,43 @@ async function typeAction(webContents: WebContents, ref: number, text: string): 
     functionDeclaration: 'function() { this.focus(); }',
   });
 
-  // Select all and delete to clear
-  await cdpSend(webContents, 'Input.dispatchKeyEvent', {
-    type: 'keyDown',
-    key: 'a',
-    code: 'KeyA',
-    modifiers: 4, // Meta
-  });
-  await cdpSend(webContents, 'Input.dispatchKeyEvent', {
-    type: 'keyUp',
-    key: 'a',
-    code: 'KeyA',
-    modifiers: 4,
-  });
-  await cdpSend(webContents, 'Input.dispatchKeyEvent', {
-    type: 'keyDown',
-    key: 'Backspace',
-    code: 'Backspace',
-  });
-  await cdpSend(webContents, 'Input.dispatchKeyEvent', {
-    type: 'keyUp',
-    key: 'Backspace',
-    code: 'Backspace',
-  });
-
-  // Type the text
-  await cdpSend(webContents, 'Input.insertText', { text });
+  try {
+    await setElementValue(webContents, objectId, text, false);
+  } catch {
+    // Fall back to browser-level typing if synthetic events were insufficient.
+    await cdpSend(webContents, 'Input.dispatchKeyEvent', {
+      type: 'keyDown',
+      key: 'a',
+      code: 'KeyA',
+      modifiers: 4,
+    });
+    await cdpSend(webContents, 'Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: 'a',
+      code: 'KeyA',
+      modifiers: 4,
+    });
+    await cdpSend(webContents, 'Input.dispatchKeyEvent', {
+      type: 'keyDown',
+      key: 'Backspace',
+      code: 'Backspace',
+    });
+    await cdpSend(webContents, 'Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: 'Backspace',
+      code: 'Backspace',
+    });
+    await cdpSend(webContents, 'Input.insertText', { text });
+  }
 
   return { ok: true };
 }
 
 async function appendAction(webContents: WebContents, ref: number, text: string): Promise<ActionResult> {
+  const backendNodeId = resolveRef(webContents, ref);
+  const { x, y } = await getBoxCenter(webContents, backendNodeId);
   const objectId = await getRemoteObject(webContents, ref);
+  await showInteractionOverlay(webContents, x, y, `Append ${ref}`);
 
   // Focus without clearing
   await cdpSend(webContents, 'Runtime.callFunctionOn', {
@@ -132,7 +259,11 @@ async function appendAction(webContents: WebContents, ref: number, text: string)
     functionDeclaration: 'function() { this.focus(); }',
   });
 
-  await cdpSend(webContents, 'Input.insertText', { text });
+  try {
+    await setElementValue(webContents, objectId, text, true);
+  } catch {
+    await cdpSend(webContents, 'Input.insertText', { text });
+  }
   return { ok: true };
 }
 
@@ -236,6 +367,7 @@ async function scrollAction(webContents: WebContents, direction: string): Promis
 async function hoverAction(webContents: WebContents, ref: number): Promise<ActionResult> {
   const backendNodeId = resolveRef(webContents, ref);
   const { x, y } = await getBoxCenter(webContents, backendNodeId);
+  await showInteractionOverlay(webContents, x, y, `Hover ${ref}`);
 
   await cdpSend(webContents, 'Input.dispatchMouseEvent', {
     type: 'mouseMoved',
@@ -248,6 +380,8 @@ async function hoverAction(webContents: WebContents, ref: number): Promise<Actio
 
 export async function executeAction(action: any): Promise<ActionResult> {
   try {
+    logActivity('action', `Action ${action.type}`, action.ref ? `ref ${action.ref}` : action.url || action.key);
+
     // Actions that don't need a tab's webContents
     if (action.type === 'wait') {
       await new Promise((resolve) => setTimeout(resolve, action.ms || 1000));

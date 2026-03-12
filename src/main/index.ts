@@ -2,19 +2,41 @@ import { app, ipcMain } from 'electron';
 
 app.commandLine.appendSwitch('disable-logging');
 app.commandLine.appendSwitch('log-level', '3');
-import { createMainWindow } from './window';
+import { createMainWindow, getControlPlaneView } from './window';
 import * as tabManager from './tab-manager';
 import { startApiServer, stopApiServer } from './api-server';
 import { getApiKey } from './auth';
+import { listActivities, subscribe as subscribeActivities } from './activity-log';
+import { listTasks, enqueueTask, subscribe as subscribeTasks } from './task-manager';
+import { getTunnelState, startTunnel, stopTunnel, subscribe as subscribeTunnel } from './tunnel-manager';
+
+function broadcastControlPlaneState(): void {
+  const state = {
+    tasks: listTasks().slice(0, 10),
+    activities: listActivities(25),
+    tunnel: getTunnelState(),
+    api: {
+      localUrl: 'http://127.0.0.1:3000',
+      apiKey: getApiKey(),
+    },
+    activePage: tabManager.getActivePageState(),
+  };
+
+  getControlPlaneView()?.webContents.send('control-plane-state', state);
+}
 
 app.whenReady().then(() => {
-  const { window, chromeView, settingsView } = createMainWindow();
+  createMainWindow();
 
   // Create default tab
   tabManager.createTab('https://www.google.com');
 
   // Start API server
   startApiServer();
+  subscribeTasks(broadcastControlPlaneState);
+  subscribeActivities(broadcastControlPlaneState);
+  subscribeTunnel(broadcastControlPlaneState);
+  broadcastControlPlaneState();
 
   // IPC handlers
   ipcMain.on('navigate', (_event, url: string) => {
@@ -64,12 +86,51 @@ app.whenReady().then(() => {
     tabManager.activateTab(id);
   });
 
-  ipcMain.on('toggle-settings', () => {
-    tabManager.toggleSettings();
+  ipcMain.on('toggle-control-plane', () => {
+    tabManager.toggleControlPlane();
+    broadcastControlPlaneState();
   });
 
-  ipcMain.handle('get-api-key', () => {
-    return getApiKey();
+  ipcMain.on('toggle-sidebar', () => {
+    tabManager.toggleSidebar();
+  });
+
+  ipcMain.handle('get-browser-state', () => {
+    return {
+      tabs: tabManager.listTabs(),
+      activePage: tabManager.getActivePageState(),
+      controlPlaneOpen: tabManager.isControlPlaneOpen(),
+      sidebarOpen: tabManager.isSidebarOpen(),
+    };
+  });
+
+  ipcMain.handle('get-control-plane-state', () => {
+    return {
+      tasks: listTasks().slice(0, 10),
+      activities: listActivities(25),
+      tunnel: getTunnelState(),
+      api: {
+        localUrl: 'http://127.0.0.1:3000',
+        apiKey: getApiKey(),
+      },
+      activePage: tabManager.getActivePageState(),
+    };
+  });
+
+  ipcMain.handle('submit-task', (_event, prompt: string) => {
+    const task = enqueueTask(prompt);
+    broadcastControlPlaneState();
+    return task;
+  });
+
+  ipcMain.handle('start-tunnel', () => {
+    startTunnel('http://127.0.0.1:3000');
+    broadcastControlPlaneState();
+  });
+
+  ipcMain.handle('stop-tunnel', () => {
+    stopTunnel();
+    broadcastControlPlaneState();
   });
 });
 

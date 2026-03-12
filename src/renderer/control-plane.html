@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <link rel="stylesheet" href="control-plane.css">
+  <title>Control Plane</title>
+</head>
+<body>
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="eyebrow">Control plane</div>
+        <div class="panel-title">Tasks, tunnel, summaries</div>
+      </div>
+      <button class="close-btn" id="close-btn" title="Hide control plane">&times;</button>
+    </div>
+
+    <div class="panel-body">
+      <section class="section">
+        <div class="section-title">Current page</div>
+        <div class="info-card">
+          <div id="active-page-title" class="info-title">No page selected</div>
+          <div id="active-page-url" class="info-detail">Open a page to start working</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Connect</div>
+        <div class="info-card connect-card">
+          <div class="tunnel-row">
+            <span id="tunnel-status" class="pill pill-stopped">local</span>
+            <button id="tunnel-action-btn" class="secondary-btn" type="button">Start tunnel</button>
+          </div>
+          <div class="connect-block-wrap">
+            <pre id="connect-block" class="connect-block">Loading...</pre>
+            <button id="copy-connect-btn" class="copy-btn" type="button" title="Copy to clipboard">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Recent actions</div>
+        <div id="activity-list" class="stack-list"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Task history</div>
+        <div id="task-list" class="stack-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <script src="control-plane-renderer.js"></script>
+</body>
+</html>

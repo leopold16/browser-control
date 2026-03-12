@@ -4,7 +4,7 @@
   "description": "Controllable browser - Electron app with REST API for LLM control",
   "main": "dist/main/index.js",
   "scripts": {
-    "build": "tsc && cp src/renderer/index.html src/renderer/styles.css src/renderer/settings.html src/renderer/settings.css dist/renderer/",
+    "build": "tsc && cp src/renderer/*.html src/renderer/*.css dist/renderer/",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron ."
   },

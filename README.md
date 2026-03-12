@@ -11,7 +11,7 @@ An Electron browser with a local REST API for LLM control. You use it as a norma
 4. repeat
 ```
 
-The browser stays logged in to whatever you've signed into. The API is `localhost`-only and key-gated.
+The browser stays logged in to whatever you've signed into. The API is `localhost`-only and does not require a key for normal local use.
 
 ## Setup
 
@@ -22,13 +22,11 @@ npm start
 
 Requires Node 18+ and macOS.
 
-On first launch an API key is generated and shown in the settings panel (gear icon, top-right).
+On first launch the browser opens with a local control plane and local API enabled.
 
 ## API
 
 Base URL: `http://localhost:3000`  
-Auth header: `Authorization: Bearer <key>`
-
 ### GET /snapshot
 
 Returns the accessibility tree of the current page — every interactive element with a stable `ref` ID.

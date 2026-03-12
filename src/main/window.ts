@@ -3,27 +3,26 @@ import * as path from 'path';
 import * as tabManager from './tab-manager';
 
 let mainWindow: BaseWindow | null = null;
-let chromeView: WebContentsView | null = null;
-let settingsView: WebContentsView | null = null;
-
-const CHROME_HEIGHT = 78;
+let toolbarView: WebContentsView | null = null;
+let sidebarView: WebContentsView | null = null;
+let controlPlaneView: WebContentsView | null = null;
 
 export function createMainWindow(): {
   window: BaseWindow;
-  chromeView: WebContentsView;
-  settingsView: WebContentsView;
+  toolbarView: WebContentsView;
+  sidebarView: WebContentsView;
+  controlPlaneView: WebContentsView;
 } {
   mainWindow = new BaseWindow({
-    width: 1280,
-    height: 900,
-    minWidth: 600,
-    minHeight: 400,
+    width: 1440,
+    height: 940,
+    minWidth: 1100,
+    minHeight: 720,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 12, y: 12 },
   });
 
-  // Chrome UI view
-  chromeView = new WebContentsView({
+  toolbarView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
@@ -31,20 +30,7 @@ export function createMainWindow(): {
     },
   });
 
-  mainWindow.contentView.addChildView(chromeView);
-
-  const bounds = mainWindow.getBounds();
-  chromeView.setBounds({
-    x: 0,
-    y: 0,
-    width: bounds.width,
-    height: CHROME_HEIGHT,
-  });
-
-  chromeView.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-
-  // Settings side panel view
-  settingsView = new WebContentsView({
+  sidebarView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
@@ -52,30 +38,47 @@ export function createMainWindow(): {
     },
   });
 
-  mainWindow.contentView.addChildView(settingsView);
-  settingsView.setVisible(false);
-  settingsView.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'settings.html'));
+  controlPlaneView = new WebContentsView({
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload', 'preload.js'),
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+
+  mainWindow.contentView.addChildView(toolbarView);
+  mainWindow.contentView.addChildView(sidebarView);
+  mainWindow.contentView.addChildView(controlPlaneView);
+
+  toolbarView.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'toolbar.html'));
+  sidebarView.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'sidebar.html'));
+  controlPlaneView.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'control-plane.html'));
 
   // Initialize tab manager
-  tabManager.init(mainWindow, chromeView);
-  tabManager.setSettingsView(settingsView);
+  tabManager.init(mainWindow, toolbarView, sidebarView);
+  tabManager.setControlPlaneView(controlPlaneView);
+  tabManager.updateAllBounds();
 
   // Handle resize
   mainWindow.on('resize', () => {
     tabManager.updateAllBounds();
   });
 
-  return { window: mainWindow, chromeView, settingsView };
+  return { window: mainWindow, toolbarView, sidebarView, controlPlaneView };
 }
 
 export function getMainWindow(): BaseWindow | null {
   return mainWindow;
 }
 
-export function getChromeView(): WebContentsView | null {
-  return chromeView;
+export function getToolbarView(): WebContentsView | null {
+  return toolbarView;
 }
 
-export function getSettingsView(): WebContentsView | null {
-  return settingsView;
+export function getSidebarView(): WebContentsView | null {
+  return sidebarView;
+}
+
+export function getControlPlaneView(): WebContentsView | null {
+  return controlPlaneView;
 }

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:">
+  <link rel="stylesheet" href="sidebar.css">
+  <title>Sidebar</title>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div>
+        <div class="eyebrow">Workspace</div>
+        <div class="brand">Browse</div>
+      </div>
+      <button id="new-tab-btn" class="new-tab-btn" title="New page">+</button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">Pages</div>
+      <div id="tabs-list" class="tabs-list"></div>
+    </div>
+  </aside>
+
+  <script src="sidebar-renderer.js"></script>
+</body>
+</html>

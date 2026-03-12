@@ -1,55 +1,111 @@
 import { BaseWindow, WebContentsView } from 'electron';
-import * as path from 'path';
 
 export interface TabInfo {
   id: string;
   url: string;
   title: string;
   active: boolean;
+  loading: boolean;
 }
 
 interface Tab {
   id: string;
   view: WebContentsView;
+  loading: boolean;
 }
 
 let mainWindow: BaseWindow | null = null;
-let chromeView: WebContentsView | null = null;
-let settingsView: WebContentsView | null = null;
-let settingsOpen = false;
+let toolbarView: WebContentsView | null = null;
+let sidebarView: WebContentsView | null = null;
+let controlPlaneView: WebContentsView | null = null;
+let controlPlaneOpen = true;
 const tabs: Tab[] = [];
 let activeTabId: string | null = null;
 let nextTabId = 1;
 
-const CHROME_HEIGHT = 78;
-const SETTINGS_WIDTH = 340;
+const TOOLBAR_HEIGHT = 72;
+const SIDEBAR_WIDTH = 280;
+const CONTROL_PLANE_WIDTH = 280;
+let sidebarOpen = true;
 
-export function init(window: BaseWindow, chrome: WebContentsView): void {
+export function init(window: BaseWindow, toolbar: WebContentsView, sidebar: WebContentsView): void {
   mainWindow = window;
-  chromeView = chrome;
+  toolbarView = toolbar;
+  sidebarView = sidebar;
 }
 
-export function setSettingsView(view: WebContentsView): void {
-  settingsView = view;
+export function setControlPlaneView(view: WebContentsView): void {
+  controlPlaneView = view;
 }
 
-export function toggleSettings(): boolean {
-  settingsOpen = !settingsOpen;
+export function toggleControlPlane(): boolean {
+  controlPlaneOpen = !controlPlaneOpen;
 
-  if (settingsView) {
-    settingsView.setVisible(settingsOpen);
+  if (controlPlaneView) {
+    controlPlaneView.setVisible(controlPlaneOpen);
   }
 
   updateAllBounds();
-  chromeView?.webContents.send('settings-toggled', settingsOpen);
-  return settingsOpen;
+  toolbarView?.webContents.send('control-plane-toggled', controlPlaneOpen);
+  return controlPlaneOpen;
 }
 
-export function isSettingsOpen(): boolean {
-  return settingsOpen;
+export function isControlPlaneOpen(): boolean {
+  return controlPlaneOpen;
 }
 
-export function createTab(url?: string): Tab {
+export function toggleSidebar(): boolean {
+  sidebarOpen = !sidebarOpen;
+
+  if (sidebarView) {
+    sidebarView.setVisible(sidebarOpen);
+  }
+
+  updateAllBounds();
+  toolbarView?.webContents.send('sidebar-toggled', sidebarOpen);
+  return sidebarOpen;
+}
+
+export function isSidebarOpen(): boolean {
+  return sidebarOpen;
+}
+
+function ensureUiOrdering(): void {
+  if (!mainWindow) return;
+
+  for (const view of [sidebarView, toolbarView, controlPlaneView]) {
+    if (!view) continue;
+    mainWindow.contentView.removeChildView(view);
+    mainWindow.contentView.addChildView(view);
+  }
+}
+
+function attachTabEvents(tab: Tab): void {
+  const contents = tab.view.webContents;
+
+  contents.setWindowOpenHandler(({ url }) => {
+    createTab(url);
+    return { action: 'deny' };
+  });
+
+  contents.on('did-navigate', () => notifyUi());
+  contents.on('did-navigate-in-page', () => notifyUi());
+  contents.on('page-title-updated', () => notifyUi());
+  contents.on('did-start-loading', () => {
+    tab.loading = true;
+    notifyUi();
+  });
+  contents.on('did-stop-loading', () => {
+    tab.loading = false;
+    notifyUi();
+  });
+  contents.on('did-fail-load', () => {
+    tab.loading = false;
+    notifyUi();
+  });
+}
+
+export function createTab(url: string = 'https://www.google.com'): Tab {
   const id = String(nextTabId++);
   const view = new WebContentsView({
     webPreferences: {
@@ -58,43 +114,20 @@ export function createTab(url?: string): Tab {
     },
   });
 
-  view.webContents.setWindowOpenHandler(({ url }) => {
-    view.webContents.loadURL(url);
-    return { action: 'deny' };
-  });
-
-  view.webContents.on('did-navigate', () => notifyChrome());
-  view.webContents.on('did-navigate-in-page', () => notifyChrome());
-  view.webContents.on('page-title-updated', () => notifyChrome());
-  view.webContents.on('did-start-loading', () => {
-    chromeView?.webContents.send('loading', true);
-  });
-  view.webContents.on('did-stop-loading', () => {
-    chromeView?.webContents.send('loading', false);
-    notifyChrome();
-  });
-
-  const tab: Tab = { id, view };
+  const tab: Tab = { id, view, loading: false };
+  attachTabEvents(tab);
   tabs.push(tab);
   mainWindow!.contentView.addChildView(view);
-
-  // Ensure settings view stays on top
-  if (settingsView && settingsOpen) {
-    mainWindow!.contentView.removeChildView(settingsView);
-    mainWindow!.contentView.addChildView(settingsView);
-  }
+  ensureUiOrdering();
 
   activateTab(id);
-  if (url) {
-    view.webContents.loadURL(url);
-  }
-
-  notifyChrome();
+  view.webContents.loadURL(url);
+  notifyUi();
   return tab;
 }
 
 export function closeTab(id: string): boolean {
-  const idx = tabs.findIndex((t) => t.id === id);
+  const idx = tabs.findIndex((tab) => tab.id === id);
   if (idx === -1) return false;
 
   const tab = tabs[idx];
@@ -108,104 +141,155 @@ export function closeTab(id: string): boolean {
   }
 
   if (activeTabId === id) {
-    const newIdx = Math.min(idx, tabs.length - 1);
-    activateTab(tabs[newIdx].id);
+    const nextIndex = Math.min(idx, tabs.length - 1);
+    activateTab(tabs[nextIndex].id);
   }
 
-  notifyChrome();
+  notifyUi();
   return true;
 }
 
 export function activateTab(id: string): boolean {
-  const tab = tabs.find((t) => t.id === id);
+  const tab = tabs.find((entry) => entry.id === id);
   if (!tab) return false;
 
   activeTabId = id;
 
-  for (const t of tabs) {
-    if (t.id === id) {
-      t.view.setVisible(true);
-      updateTabBounds(t.view);
+  for (const entry of tabs) {
+    if (entry.id === id) {
+      entry.view.setVisible(true);
+      updateTabBounds(entry.view);
     } else {
-      t.view.setVisible(false);
+      entry.view.setVisible(false);
     }
   }
 
-  notifyChrome();
+  notifyUi();
   return true;
 }
 
 export function getActiveTab(): Tab | null {
-  return tabs.find((t) => t.id === activeTabId) || null;
+  return tabs.find((tab) => tab.id === activeTabId) || null;
 }
 
 export function getTab(id: string): Tab | null {
-  return tabs.find((t) => t.id === id) || null;
+  return tabs.find((tab) => tab.id === id) || null;
 }
 
 export function listTabs(): TabInfo[] {
-  return tabs.map((t) => ({
-    id: t.id,
-    url: t.view.webContents.getURL(),
-    title: t.view.webContents.getTitle(),
-    active: t.id === activeTabId,
+  return tabs.map((tab) => ({
+    id: tab.id,
+    url: tab.view.webContents.getURL(),
+    title: tab.view.webContents.getTitle() || 'New page',
+    active: tab.id === activeTabId,
+    loading: tab.loading,
   }));
 }
 
-function getContentWidth(): number {
-  if (!mainWindow) return 0;
+export function getActivePageState(): {
+  url: string;
+  title: string;
+  loading: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+} | null {
+  const active = getActiveTab();
+  if (!active) return null;
+
+  return {
+    url: active.view.webContents.getURL(),
+    title: active.view.webContents.getTitle() || 'New page',
+    loading: active.loading,
+    canGoBack: active.view.webContents.canGoBack(),
+    canGoForward: active.view.webContents.canGoForward(),
+  };
+}
+
+function getContentBounds(): { x: number; y: number; width: number; height: number } {
+  if (!mainWindow) {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+
   const bounds = mainWindow.getBounds();
-  return settingsOpen ? bounds.width - SETTINGS_WIDTH : bounds.width;
+  const leftInset = sidebarOpen ? SIDEBAR_WIDTH : 0;
+  const rightInset = controlPlaneOpen ? CONTROL_PLANE_WIDTH : 0;
+  return {
+    x: leftInset,
+    y: TOOLBAR_HEIGHT,
+    width: Math.max(320, bounds.width - leftInset - rightInset),
+    height: Math.max(200, bounds.height - TOOLBAR_HEIGHT),
+  };
 }
 
 function updateTabBounds(view: WebContentsView): void {
-  if (!mainWindow) return;
+  view.setBounds(getContentBounds());
+}
+
+function updateToolbarBounds(): void {
+  if (!mainWindow || !toolbarView) return;
   const bounds = mainWindow.getBounds();
-  const contentWidth = getContentWidth();
-  view.setBounds({
-    x: 0,
-    y: CHROME_HEIGHT,
-    width: contentWidth,
-    height: bounds.height - CHROME_HEIGHT,
+  const leftInset = sidebarOpen ? SIDEBAR_WIDTH : 0;
+  const rightInset = controlPlaneOpen ? CONTROL_PLANE_WIDTH : 0;
+  toolbarView.setBounds({
+    x: leftInset,
+    y: 0,
+    width: Math.max(320, bounds.width - leftInset - rightInset),
+    height: TOOLBAR_HEIGHT,
   });
 }
 
-function updateSettingsBounds(): void {
-  if (!mainWindow || !settingsView) return;
+function updateSidebarBounds(): void {
+  if (!mainWindow || !sidebarView || !sidebarOpen) return;
   const bounds = mainWindow.getBounds();
-  settingsView.setBounds({
-    x: bounds.width - SETTINGS_WIDTH,
-    y: CHROME_HEIGHT,
-    width: SETTINGS_WIDTH,
-    height: bounds.height - CHROME_HEIGHT,
+  sidebarView.setBounds({
+    x: 0,
+    y: 0,
+    width: SIDEBAR_WIDTH,
+    height: bounds.height,
+  });
+}
+
+function updateControlPlaneBounds(): void {
+  if (!mainWindow || !controlPlaneView || !controlPlaneOpen) return;
+  const bounds = mainWindow.getBounds();
+  controlPlaneView.setBounds({
+    x: bounds.width - CONTROL_PLANE_WIDTH,
+    y: 0,
+    width: CONTROL_PLANE_WIDTH,
+    height: bounds.height,
   });
 }
 
 export function updateAllBounds(): void {
-  const tab = getActiveTab();
-  if (tab) {
-    updateTabBounds(tab.view);
+  const active = getActiveTab();
+  if (active) {
+    updateTabBounds(active.view);
   }
-  if (chromeView && mainWindow) {
-    const bounds = mainWindow.getBounds();
-    chromeView.setBounds({
-      x: 0,
-      y: 0,
-      width: bounds.width,
-      height: CHROME_HEIGHT,
-    });
+
+  updateToolbarBounds();
+
+  if (sidebarView) {
+    sidebarView.setVisible(sidebarOpen);
   }
-  if (settingsView && settingsOpen) {
-    updateSettingsBounds();
+  updateSidebarBounds();
+
+  if (controlPlaneView) {
+    controlPlaneView.setVisible(controlPlaneOpen);
   }
+  updateControlPlaneBounds();
+  ensureUiOrdering();
 }
 
-function notifyChrome(): void {
-  if (!chromeView) return;
-  const active = getActiveTab();
-  chromeView.webContents.send('tabs-changed', listTabs());
-  if (active) {
-    chromeView.webContents.send('url-changed', active.view.webContents.getURL());
-    chromeView.webContents.send('title-changed', active.view.webContents.getTitle());
+export function notifyUi(): void {
+  const tabsState = listTabs();
+  const pageState = getActivePageState();
+
+  sidebarView?.webContents.send('tabs-changed', tabsState);
+  toolbarView?.webContents.send('tabs-changed', tabsState);
+  toolbarView?.webContents.send('page-state', pageState);
+  controlPlaneView?.webContents.send('page-state', pageState);
+
+  if (pageState) {
+    sidebarView?.webContents.send('page-state', pageState);
   }
 }

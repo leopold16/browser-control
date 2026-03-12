@@ -13,20 +13,24 @@ interface AXNode {
   backendDOMNodeId?: number;
   role?: { value: string };
   name?: { value: string };
+  description?: { value: string };
   value?: { value: string };
   properties?: Array<{ name: string; value: { value: any } }>;
   childIds?: string[];
   ignored?: boolean;
 }
 
-interface SnapshotNode {
+export interface SnapshotNode {
   ref: number;
   role: string;
   name: string;
   value?: string;
+  description?: string;
+  placeholder?: string;
   checked?: boolean;
   selected?: boolean;
   disabled?: boolean;
+  readonly?: boolean;
   children?: SnapshotNode[];
 }
 
@@ -141,6 +145,12 @@ export async function getSnapshot(
       entry.value = String(value);
     }
 
+    const description = node.description?.value || getProp(node, 'description');
+    if (description) entry.description = String(description);
+
+    const placeholder = getProp(node, 'placeholder');
+    if (placeholder) entry.placeholder = String(placeholder);
+
     const checked = getProp(node, 'checked');
     if (checked !== undefined) entry.checked = checked === 'true' || checked === true;
 
@@ -149,6 +159,9 @@ export async function getSnapshot(
 
     const disabled = getProp(node, 'disabled');
     if (disabled !== undefined) entry.disabled = disabled === true;
+
+    const readonly = getProp(node, 'readonly');
+    if (readonly !== undefined) entry.readonly = readonly === true || readonly === 'true';
 
     flatNodes.push(entry);
   }
@@ -223,6 +236,12 @@ function buildSubtree(
   const value = node.value?.value;
   if (value !== undefined && value !== '') entry.value = String(value);
 
+  const description = node.description?.value || getProp(node, 'description');
+  if (description) entry.description = String(description);
+
+  const placeholder = getProp(node, 'placeholder');
+  if (placeholder) entry.placeholder = String(placeholder);
+
   const checked = getProp(node, 'checked');
   if (checked !== undefined) entry.checked = checked === 'true' || checked === true;
 
@@ -231,6 +250,9 @@ function buildSubtree(
 
   const disabled = getProp(node, 'disabled');
   if (disabled !== undefined) entry.disabled = disabled === true;
+
+  const readonly = getProp(node, 'readonly');
+  if (readonly !== undefined) entry.readonly = readonly === true || readonly === 'true';
 
   // Recurse children
   if (node.childIds?.length) {

@@ -1,6 +1,6 @@
 import express from 'express';
-import { authMiddleware } from './auth';
 import apiRoutes from './api-routes';
+import { authMiddleware } from './auth';
 
 let server: ReturnType<typeof express.application.listen> | null = null;
 
