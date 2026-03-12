@@ -1,22 +1,18 @@
 :root {
-  --bg: rgba(10, 12, 16, 0.94);
-  --panel: rgba(18, 22, 30, 0.92);
-  --panel-strong: rgba(23, 28, 39, 0.96);
-  --border: rgba(148, 163, 184, 0.16);
-  --text: #f8fafc;
-  --muted: #94a3b8;
+  --bg: #050508;
+  --surface: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e4e4e7;
+  --muted: #71717a;
   --accent: #60a5fa;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
   color: var(--text);
-  background: linear-gradient(180deg, rgba(8, 11, 17, 0.98), rgba(10, 12, 16, 0.82));
+  background: var(--bg);
   overflow: hidden;
   user-select: none;
   -webkit-font-smoothing: antialiased;
@@ -26,8 +22,8 @@ body {
   height: 72px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  gap: 6px;
+  padding: 0 10px;
 }
 
 .window-drag {
@@ -37,44 +33,40 @@ body {
   -webkit-app-region: drag;
 }
 
-.nav-group,
-.address-shell,
-.icon-btn,
-.url-bar,
-.toolbar-right-group,
-.page-context {
+.nav-group, .address-shell, .icon-btn, .url-bar,
+.toolbar-right-group, .page-context {
   -webkit-app-region: no-drag;
 }
 
 .nav-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
 .icon-btn {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.2s ease, color 0.2s ease;
   flex-shrink: 0;
 }
 
 .icon-btn:hover {
-  background: var(--panel);
+  background: var(--surface);
   color: var(--text);
 }
 
 .icon-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: default;
 }
 
@@ -84,36 +76,35 @@ body {
 }
 
 .icon-btn.active {
-  background: rgba(96, 165, 250, 0.18);
-  border-color: rgba(96, 165, 250, 0.36);
+  background: rgba(96, 165, 250, 0.12);
   color: var(--accent);
 }
 
-.sidebar-toggle-btn {
-  margin-right: 4px;
-}
+.sidebar-toggle-btn { margin-right: 2px; }
 
 .address-shell {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  height: 36px;
+  height: 34px;
   padding: 0 12px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--panel-strong);
-  transition: border-color 0.15s;
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .address-shell:focus-within {
-  border-color: rgba(96, 165, 250, 0.5);
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .address-icon {
   color: var(--muted);
   flex-shrink: 0;
+  opacity: 0.6;
 }
 
 .url-bar {
@@ -126,56 +117,49 @@ body {
   font-size: 13px;
 }
 
-.url-bar::placeholder {
-  color: var(--muted);
-}
+.url-bar::placeholder { color: var(--muted); }
 
 .toolbar-right-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
   min-width: 0;
 }
 
 .page-context {
   min-width: 0;
-  max-width: 200px;
+  max-width: 180px;
 }
 
 .page-title {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--text);
 }
 
 .page-meta {
   margin-top: 1px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.panel-toggle-btn {
-  margin-left: 2px;
-}
+.panel-toggle-btn { margin-left: 2px; }
 
 .spinner {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.1);
   border-top-color: var(--accent);
   display: inline-block;
   animation: spin 0.9s linear infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+@keyframes spin { to { transform: rotate(360deg); } }

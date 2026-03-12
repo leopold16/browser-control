@@ -10,47 +10,47 @@
 <body>
   <div class="panel">
     <div class="panel-header">
-      <div>
-        <div class="eyebrow">Control plane</div>
-        <div class="panel-title">Tasks, tunnel, summaries</div>
-      </div>
-      <button class="close-btn" id="close-btn" title="Hide control plane">&times;</button>
+      <div class="panel-brand">Control</div>
+      <button class="close-btn" id="close-btn" title="Hide">&times;</button>
     </div>
 
     <div class="panel-body">
-      <section class="section">
-        <div class="section-title">Current page</div>
-        <div class="info-card">
-          <div id="active-page-title" class="info-title">No page selected</div>
-          <div id="active-page-url" class="info-detail">Open a page to start working</div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-title">Connect</div>
-        <div class="info-card connect-card">
+      <div class="connect-section">
+        <div class="connect-header">
+          <div class="connect-label">Connection</div>
           <div class="tunnel-row">
             <span id="tunnel-status" class="pill pill-stopped">local</span>
-            <button id="tunnel-action-btn" class="secondary-btn" type="button">Start tunnel</button>
-          </div>
-          <div class="connect-block-wrap">
-            <pre id="connect-block" class="connect-block">Loading...</pre>
-            <button id="copy-connect-btn" class="copy-btn" type="button" title="Copy to clipboard">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-            </button>
+            <button id="tunnel-action-btn" class="tunnel-btn" type="button">Start tunnel</button>
           </div>
         </div>
-      </section>
 
-      <section class="section">
-        <div class="section-title">Recent actions</div>
-        <div id="activity-list" class="stack-list"></div>
-      </section>
+        <div id="connect-url-block" class="connect-url-block">
+          <div class="label">Base URL</div>
+          <div class="value" id="connect-url">http://127.0.0.1:3000</div>
+        </div>
 
-      <section class="section">
-        <div class="section-title">Task history</div>
-        <div id="task-list" class="stack-list"></div>
-      </section>
+        <div class="key-toggle" id="key-toggle">
+          <span class="key-toggle-label">API Key</span>
+          <span class="key-toggle-chevron">&#9660;</span>
+        </div>
+        <div class="key-value" id="key-value"></div>
+
+        <div class="copy-row">
+          <button class="copy-action" id="copy-creds-btn" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Credentials
+          </button>
+          <button class="copy-action" id="copy-docs-btn" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            With docs
+          </button>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="section-label">Activity</div>
+      <div id="activity-list" class="activity-feed"></div>
     </div>
   </div>
 

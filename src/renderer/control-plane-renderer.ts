@@ -50,39 +50,99 @@ const controlApi = (window as any).browserAPI as {
 const closeBtn = document.getElementById('close-btn')!;
 const tunnelStatusEl = document.getElementById('tunnel-status')!;
 const tunnelActionBtn = document.getElementById('tunnel-action-btn') as HTMLButtonElement;
-const connectBlockEl = document.getElementById('connect-block')!;
-const copyConnectBtn = document.getElementById('copy-connect-btn') as HTMLButtonElement;
-const pageTitleEl = document.getElementById('active-page-title')!;
-const pageUrlEl = document.getElementById('active-page-url')!;
+const connectUrlEl = document.getElementById('connect-url')!;
+const connectUrlBlock = document.getElementById('connect-url-block')!;
+const keyToggle = document.getElementById('key-toggle')!;
+const keyValueEl = document.getElementById('key-value')!;
+const copyCredsBtn = document.getElementById('copy-creds-btn') as HTMLButtonElement;
+const copyDocsBtn = document.getElementById('copy-docs-btn') as HTMLButtonElement;
 const activitiesEl = document.getElementById('activity-list')!;
-const tasksEl = document.getElementById('task-list')!;
 
 let latestState: ControlPlaneState | null = null;
+let keyRevealed = false;
 
 function copyText(value: string): void {
   navigator.clipboard.writeText(value);
 }
 
-function buildConnectCommand(state: ControlPlaneState): string {
-  const tunnelRunning = state.tunnel.status === 'running' && state.tunnel.publicUrl;
-  const baseUrl = tunnelRunning ? state.tunnel.publicUrl! : state.api.localUrl;
+function flashCopied(btn: HTMLButtonElement): void {
+  btn.classList.add('copied');
+  setTimeout(() => btn.classList.remove('copied'), 1200);
+}
 
+function getBaseUrl(state: ControlPlaneState): string {
+  const tunnelRunning = state.tunnel.status === 'running' && state.tunnel.publicUrl;
+  return tunnelRunning ? state.tunnel.publicUrl! : state.api.localUrl;
+}
+
+function buildCreds(state: ControlPlaneState): string {
   return [
-    `BROWSER_CONTROL_URL=${baseUrl}`,
+    `BROWSER_CONTROL_URL=${getBaseUrl(state)}`,
     `BROWSER_CONTROL_API_KEY=${state.api.apiKey}`,
   ].join('\n');
 }
 
-function renderConnectBlock(state: ControlPlaneState): void {
+function buildDocsPayload(state: ControlPlaneState): string {
+  const url = getBaseUrl(state);
+  const key = state.api.apiKey;
+  return `# Browser Control API
+
+Base URL: ${url}
+API Key: ${key}
+Auth: Authorization: Bearer ${key}
+
+## Endpoints
+
+GET  /state          Full browser state (tabs, page, tunnel)
+GET  /snapshot       Accessibility tree (add ?full=true for nested)
+GET  /screenshot     PNG of active tab
+GET  /page           Structured: text fields, buttons, links, headings
+POST /action         Execute action (see below)
+GET  /tabs           List tabs
+POST /tabs           New tab { "url": "..." }
+DELETE /tabs/:id     Close tab
+POST /tabs/:id/activate  Switch tab
+GET  /history        Recent activity log
+
+## Actions (POST /action)
+
+{ "type": "click",    "ref": 7 }
+{ "type": "type",     "ref": 3, "text": "hello" }
+{ "type": "append",   "ref": 3, "text": " world" }
+{ "type": "key",      "key": "Enter" }
+{ "type": "select",   "ref": 12, "value": "Option" }
+{ "type": "scroll",   "direction": "down" }
+{ "type": "hover",    "ref": 5 }
+{ "type": "navigate", "url": "https://example.com" }
+{ "type": "back" }
+{ "type": "forward" }
+{ "type": "refresh" }
+{ "type": "wait",     "ms": 2000 }
+{ "type": "done",     "result": "summary" }
+
+## How it works
+
+1. GET /snapshot → see every interactive element with ref IDs
+2. Pick an action based on the snapshot
+3. POST /action → execute it
+4. Repeat
+
+Refs are per-snapshot. Take a new snapshot after page changes.
+Snapshot nodes have: ref, role, name, value?, placeholder?, checked?, disabled?
+GET /page returns pre-extracted textFields, buttons, links, headings.
+`;
+}
+
+function renderConnect(state: ControlPlaneState): void {
   const tunnelRunning = state.tunnel.status === 'running' && state.tunnel.publicUrl;
 
   tunnelStatusEl.textContent = tunnelRunning ? 'tunnel' : 'local';
   tunnelStatusEl.className = tunnelRunning ? 'pill pill-running' : 'pill pill-stopped';
   tunnelActionBtn.textContent = state.tunnel.status === 'running' || state.tunnel.status === 'starting'
-    ? 'Stop tunnel'
-    : 'Start tunnel';
+    ? 'Stop' : 'Start tunnel';
 
-  connectBlockEl.textContent = buildConnectCommand(state);
+  connectUrlEl.textContent = getBaseUrl(state);
+  keyValueEl.textContent = state.api.apiKey;
 }
 
 function renderActivities(
@@ -93,85 +153,60 @@ function renderActivities(
   if (activities.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent = 'No recent actions yet.';
+    empty.textContent = 'No activity yet';
     activitiesEl.appendChild(empty);
     return;
   }
 
-  for (const activity of activities) {
-    const card = document.createElement('div');
-    card.className = 'log-card';
+  const shown = activities.slice(0, 20);
+  for (const a of shown) {
+    const row = document.createElement('div');
+    row.className = 'activity-row';
 
-    const label = document.createElement('div');
-    label.className = 'log-title';
-    label.textContent = activity.label;
+    const kind = document.createElement('span');
+    kind.className = 'activity-kind';
+    kind.textContent = a.kind;
 
-    const detail = document.createElement('div');
-    detail.className = 'log-detail';
-    detail.textContent = activity.detail || activity.kind;
+    const text = document.createElement('span');
+    text.className = 'activity-text';
+    text.textContent = a.detail || a.label;
 
-    card.appendChild(label);
-    card.appendChild(detail);
-    activitiesEl.appendChild(card);
-  }
-}
-
-function renderTasks(tasks: ControlPlaneState['tasks']): void {
-  tasksEl.replaceChildren();
-
-  if (tasks.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.textContent = 'Queued and completed tasks will show up here.';
-    tasksEl.appendChild(empty);
-    return;
-  }
-
-  for (const task of tasks) {
-    const card = document.createElement('div');
-    card.className = 'task-card';
-
-    const header = document.createElement('div');
-    header.className = 'task-header';
-
-    const title = document.createElement('div');
-    title.className = 'task-prompt';
-    title.textContent = task.prompt;
-
-    const badge = document.createElement('span');
-    badge.className = `task-status status-${task.status}`;
-    badge.textContent = task.status;
-
-    const summary = document.createElement('div');
-    summary.className = 'task-summary';
-    summary.textContent = task.summary || task.error || task.steps.at(-1)?.message || 'Waiting to run…';
-
-    header.appendChild(title);
-    header.appendChild(badge);
-    card.appendChild(header);
-    card.appendChild(summary);
-    tasksEl.appendChild(card);
+    row.appendChild(kind);
+    row.appendChild(text);
+    activitiesEl.appendChild(row);
   }
 }
 
 function renderState(state: ControlPlaneState): void {
   latestState = state;
-
-  pageTitleEl.textContent = state.activePage?.title || 'No page selected';
-  pageUrlEl.textContent = state.activePage?.url || 'Open a page to start working';
-
-  renderConnectBlock(state);
+  renderConnect(state);
   renderActivities(state.activities);
-  renderTasks(state.tasks);
 }
 
 closeBtn.addEventListener('click', () => controlApi.toggleControlPlane());
 
-copyConnectBtn.addEventListener('click', () => {
+keyToggle.addEventListener('click', () => {
+  keyRevealed = !keyRevealed;
+  keyValueEl.classList.toggle('visible', keyRevealed);
+  keyToggle.classList.toggle('open', keyRevealed);
+});
+
+connectUrlBlock.addEventListener('click', () => {
   if (!latestState) return;
-  copyText(buildConnectCommand(latestState));
-  copyConnectBtn.classList.add('copied');
-  setTimeout(() => copyConnectBtn.classList.remove('copied'), 1500);
+  copyText(getBaseUrl(latestState));
+  flashCopied(copyCredsBtn);
+});
+
+copyCredsBtn.addEventListener('click', () => {
+  if (!latestState) return;
+  copyText(buildCreds(latestState));
+  flashCopied(copyCredsBtn);
+});
+
+copyDocsBtn.addEventListener('click', () => {
+  if (!latestState) return;
+  copyText(buildDocsPayload(latestState));
+  flashCopied(copyDocsBtn);
 });
 
 tunnelActionBtn.addEventListener('click', async () => {
@@ -183,8 +218,5 @@ tunnelActionBtn.addEventListener('click', async () => {
 });
 
 controlApi.onControlPlaneState((state) => renderState(state));
-controlApi.onPageState((state) => {
-  pageTitleEl.textContent = state?.title || 'No page selected';
-  pageUrlEl.textContent = state?.url || 'Open a page to start working';
-});
+controlApi.onPageState(() => {});
 controlApi.getControlPlaneState().then((state) => renderState(state));

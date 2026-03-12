@@ -113,6 +113,7 @@ export function createTab(url: string = 'https://www.google.com'): Tab {
       sandbox: true,
     },
   });
+  view.setBackgroundColor('#050508');
 
   const tab: Tab = { id, view, loading: false };
   attachTabEvents(tab);

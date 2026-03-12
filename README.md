@@ -1,17 +1,8 @@
 # browser-control
 
-An Electron browser with a local REST API for LLM control. You use it as a normal browser — log into your tools, browse around. Behind the scenes, an LLM can see and interact with the page via the API.
+A controllable Electron browser with a REST API. Use it as a normal browser — log into sites, browse around — while external tools interact with the page through the API.
 
-## How it works
-
-```
-1. GET /snapshot   →  LLM sees every interactive element on the page (accessibility tree)
-2. LLM picks action  →  click, type, navigate, scroll, ...
-3. POST /action    →  action executes in the browser
-4. repeat
-```
-
-The browser stays logged in to whatever you've signed into. The API is `localhost`-only and does not require a key for normal local use.
+No AI or LLM built in. The browser exposes endpoints for navigation, clicking, typing, screenshots, and reading the accessibility tree. Any tool (OpenClaw, Claude, custom scripts) can drive it.
 
 ## Setup
 
@@ -20,80 +11,62 @@ npm install
 npm start
 ```
 
-Requires Node 18+ and macOS.
+Requires Node 18+ and Electron 33+. macOS only (uses native traffic lights and `hiddenInset` title bar).
 
-On first launch the browser opens with a local control plane and local API enabled.
+## How it works
 
-## API
+The browser has three panels:
 
-Base URL: `http://localhost:3000`  
-### GET /snapshot
+- **Sidebar** (left, toggleable) — open tabs, switch between them, create/close tabs
+- **Toolbar** (top) — back/forward/refresh, URL bar, toggle buttons for both sidebars
+- **Control plane** (right, toggleable) — current page info, connection block with API key, tunnel controls, activity log
 
-Returns the accessibility tree of the current page — every interactive element with a stable `ref` ID.
+On launch, an Express server starts on `http://127.0.0.1:3000` with all API routes. An API key is auto-generated on first run and persisted in `~/.config/browser-control/config.json` (or equivalent `userData` path). Every request requires `Authorization: Bearer <key>`.
 
-```json
-{
-  "url": "https://kayak.com/flights",
-  "title": "KAYAK – Flights",
-  "tree": [
-    { "ref": 3, "role": "combobox", "name": "From", "value": "" },
-    { "ref": 4, "role": "combobox", "name": "To", "value": "" },
-    { "ref": 7, "role": "button", "name": "Search" }
-  ]
-}
+The control plane shows a copyable connection block:
+
+```
+BROWSER_CONTROL_URL=http://127.0.0.1:3000
+BROWSER_CONTROL_API_KEY=<your-key>
 ```
 
-Add `?full=true` to get the complete nested tree including headings and static text.
+Start a Cloudflare tunnel from the control plane to get a public URL. The connection block switches automatically:
 
-### POST /action
-
-```json
-{ "type": "click",    "ref": 7 }
-{ "type": "type",     "ref": 3, "text": "JFK" }
-{ "type": "navigate", "url": "https://kayak.com" }
-{ "type": "key",      "key": "Enter" }
-{ "type": "select",   "ref": 12, "value": "Economy" }
-{ "type": "scroll",   "direction": "down" }
-{ "type": "wait",     "ms": 2000 }
-{ "type": "done",     "result": "Task complete summary" }
+```
+BROWSER_CONTROL_URL=https://xxx.trycloudflare.com
+BROWSER_CONTROL_API_KEY=<your-key>
 ```
 
-Response: `{ "ok": true }` or `{ "ok": false, "error": "..." }`
+Copy and paste into your tool's config.
 
-### GET /screenshot
+## API overview
 
-Returns a PNG of the current viewport. Useful when the snapshot isn't enough (charts, visual layout).
-
-### Tab management
+See **[docs/API.md](docs/API.md)** for the full reference with examples.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/tabs` | List all open tabs |
-| POST | `/tabs` | Open a new tab `{ "url": "..." }` |
+| GET | `/state` | Full browser state (tabs, active page, tunnel, activities) |
+| GET | `/snapshot` | Accessibility tree of the active tab |
+| GET | `/screenshot` | PNG screenshot of the active tab |
+| GET | `/page` | Structured extract: text fields, buttons, links, headings |
+| POST | `/action` | Execute a browser action (click, type, navigate, ...) |
+| GET | `/tabs` | List open tabs |
+| POST | `/tabs` | Open a new tab |
 | DELETE | `/tabs/:id` | Close a tab |
 | POST | `/tabs/:id/activate` | Switch to a tab |
+| GET | `/history` | Recent task summaries and activity log |
+| GET | `/tasks` | All tasks |
+| POST | `/tasks` | Enqueue a task |
+| POST | `/tunnel/start` | Start Cloudflare tunnel |
+| POST | `/tunnel/stop` | Stop Cloudflare tunnel |
 
-## LLM system prompt
+## Typical integration loop
 
 ```
-You control a browser. Each turn you receive a snapshot of the current page
-showing all interactive elements with ref IDs.
-
-Respond with a JSON action to perform. Options:
-  { "type": "click",    "ref": <id> }
-  { "type": "type",     "ref": <id>, "text": "..." }
-  { "type": "navigate", "url": "..." }
-  { "type": "key",      "key": "Enter" }
-  { "type": "select",   "ref": <id>, "value": "..." }
-  { "type": "scroll",   "direction": "up" | "down" }
-  { "type": "wait",     "ms": <number> }
-  { "type": "done",     "result": "..." }
-
-When the task is complete, respond with type "done" and a summary.
-
-Current task: {user_task}
-Current snapshot:
-{snapshot}
+1. GET /snapshot   →  tool sees every interactive element with ref IDs
+2. tool decides    →  pick an action based on the snapshot
+3. POST /action    →  execute it (click, type, navigate, ...)
+4. repeat until done
 ```
 
 ## Project structure
@@ -101,20 +74,22 @@ Current snapshot:
 ```
 src/
   main/
-    index.ts          # app entry, IPC handlers
-    window.ts         # BaseWindow + WebContentsView setup
-    tab-manager.ts    # tab lifecycle, bounds, settings panel
-    api-server.ts     # Express REST API
-    auth.ts           # API key generation + persistence
-    snapshot.ts       # accessibility tree builder
-    actions.ts        # action executor
+    index.ts            # app entry, IPC handlers
+    window.ts           # BaseWindow + WebContentsView setup
+    tab-manager.ts      # tab lifecycle, layout, sidebar toggling
+    api-server.ts       # Express server on port 3000
+    api-routes.ts       # all REST endpoints
+    auth.ts             # auto-generated API key + Bearer middleware
+    snapshot.ts         # accessibility tree builder (CDP)
+    actions.ts          # action executor (click, type, scroll, ...)
+    cdp.ts              # Chrome DevTools Protocol helpers
+    activity-log.ts     # in-memory activity log
+    task-manager.ts     # task queue + persistence
+    tunnel-manager.ts   # Cloudflare tunnel (cloudflared)
   preload/
-    preload.ts        # context bridge (chrome ↔ main)
+    preload.ts          # contextBridge (renderer ↔ main IPC)
   renderer/
-    index.html        # browser chrome UI
-    renderer.ts       # chrome UI logic
-    styles.css
-    settings.html     # API settings side panel
-    settings-renderer.ts
-    settings.css
+    toolbar.html/css/ts     # top bar: nav, URL, sidebar toggles
+    sidebar.html/css/ts     # left panel: tabs
+    control-plane.html/css/ts  # right panel: connect, tunnel, history
 ```

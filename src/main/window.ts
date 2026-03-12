@@ -20,6 +20,7 @@ export function createMainWindow(): {
     minHeight: 720,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 12, y: 12 },
+    backgroundColor: '#050508',
   });
 
   toolbarView = new WebContentsView({
