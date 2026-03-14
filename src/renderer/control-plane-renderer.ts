@@ -56,6 +56,7 @@ const keyToggle = document.getElementById('key-toggle')!;
 const keyValueEl = document.getElementById('key-value')!;
 const copyCredsBtn = document.getElementById('copy-creds-btn') as HTMLButtonElement;
 const copyDocsBtn = document.getElementById('copy-docs-btn') as HTMLButtonElement;
+const copyMcpBtn = document.getElementById('copy-mcp-btn') as HTMLButtonElement;
 const activitiesEl = document.getElementById('activity-list')!;
 
 let latestState: ControlPlaneState | null = null;
@@ -133,6 +134,39 @@ GET /page returns pre-extracted textFields, buttons, links, headings.
 `;
 }
 
+function buildMcpConfig(state: ControlPlaneState): string {
+  const tunnelRunning = state.tunnel.status === 'running' && state.tunnel.publicUrl;
+
+  if (tunnelRunning) {
+    return JSON.stringify({
+      mcpServers: {
+        'browser-control': {
+          url: `${state.tunnel.publicUrl}/mcp`,
+          headers: {
+            Authorization: `Bearer ${state.api.apiKey}`,
+          },
+        },
+      },
+    }, null, 2);
+  }
+
+  // Local: use npx mcp-remote as a stdio bridge since Claude Desktop
+  // can't connect to local HTTP servers directly
+  return JSON.stringify({
+    mcpServers: {
+      'browser-control': {
+        command: 'npx',
+        args: [
+          'mcp-remote',
+          `${state.api.localUrl}/mcp`,
+          `--header',
+          'Authorization: Bearer ${state.api.apiKey}`,
+        ],
+      },
+    },
+  }, null, 2);
+}
+
 function renderConnect(state: ControlPlaneState): void {
   const tunnelRunning = state.tunnel.status === 'running' && state.tunnel.publicUrl;
 
@@ -207,6 +241,12 @@ copyDocsBtn.addEventListener('click', () => {
   if (!latestState) return;
   copyText(buildDocsPayload(latestState));
   flashCopied(copyDocsBtn);
+});
+
+copyMcpBtn.addEventListener('click', () => {
+  if (!latestState) return;
+  copyText(buildMcpConfig(latestState));
+  flashCopied(copyMcpBtn);
 });
 
 tunnelActionBtn.addEventListener('click', async () => {

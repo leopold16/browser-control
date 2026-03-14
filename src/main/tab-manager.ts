@@ -1,4 +1,4 @@
-import { BaseWindow, WebContentsView } from 'electron';
+import { BaseWindow, WebContentsView, session } from 'electron';
 
 export interface TabInfo {
   id: string;
@@ -32,6 +32,16 @@ export function init(window: BaseWindow, toolbar: WebContentsView, sidebar: WebC
   mainWindow = window;
   toolbarView = toolbar;
   sidebarView = sidebar;
+
+  // Strip headers that block top-level navigation in Electron
+  // (browsers only enforce these for iframes, not top-level pages)
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...details.responseHeaders };
+    delete headers['cross-origin-opener-policy'];
+    delete headers['cross-origin-embedder-policy'];
+    delete headers['x-frame-options'];
+    callback({ responseHeaders: headers });
+  });
 }
 
 export function setControlPlaneView(view: WebContentsView): void {
@@ -201,8 +211,8 @@ export function getActivePageState(): {
     url: active.view.webContents.getURL(),
     title: active.view.webContents.getTitle() || 'New page',
     loading: active.loading,
-    canGoBack: active.view.webContents.canGoBack(),
-    canGoForward: active.view.webContents.canGoForward(),
+    canGoBack: active.view.webContents.navigationHistory.canGoBack(),
+    canGoForward: active.view.webContents.navigationHistory.canGoForward(),
   };
 }
 
